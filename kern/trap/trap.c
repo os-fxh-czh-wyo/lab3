@@ -1,13 +1,14 @@
-#include <assert.h>
+#include <assert.h> // 内核调试
 #include <clock.h>
-#include <console.h>
+#include <console.h> // 向控制台输出字符、从控制台读取字符，并占位式地定义键盘/串口中断处理与初始化函数。
 #include <defs.h>
-#include <kdebug.h>
+#include <kdebug.h> // 打印内核信息和做栈回溯/符号信息查询
 #include <memlayout.h>
 #include <mmu.h>
 #include <riscv.h>
 #include <stdio.h>
 #include <trap.h>
+#include <sbi.h> // 调用sbi_shutdown函数关机
 
 #define TICK_NUM 100
 
@@ -43,16 +44,16 @@ void idt_init(void) {
      *     Notice: the argument of lidt is idt_pd. try to find it!
      */
 
-    extern void __alltraps(void);
+    extern void __alltraps(void); // 由汇编/工具生成的所有中断/异常入口点的统一入口
     /* Set sup0 scratch register to 0, indicating to exception vector
        that we are presently executing in the kernel */
     write_csr(sscratch, 0);
     /* Set the exception vector address */
-    write_csr(stvec, &__alltraps);
+    write_csr(stvec, &__alltraps); // 把Supervisor trap vector基址写入 stvec，使得以后发生的 S-mode 异常/中断会跳转到 __alltraps
 }
 
 /* trap_in_kernel - test if trap happened in kernel */
-bool trap_in_kernel(struct trapframe *tf) {
+bool trap_in_kernel(struct trapframe *tf) { // 若为 1，说明中断发生时处理器处在内核模式；否则是在用户模式。
     return (tf->status & SSTATUS_SPP) != 0;
 }
 
@@ -100,9 +101,9 @@ void print_regs(struct pushregs *gpr) {
     cprintf("  t6       0x%08x\n", gpr->t6);
 }
 
-void interrupt_handler(struct trapframe *tf) {
-    intptr_t cause = (tf->cause << 1) >> 1;
-    switch (cause) {
+void interrupt_handler(struct trapframe *tf) { // 处理中断
+    intptr_t cause = (tf->cause << 1) >> 1; // 清除中断标志位，得到中断号
+    switch (cause) { // SOFT：软件中断；TIMER：时钟中断；EXT：外部中断
         case IRQ_U_SOFT:
             cprintf("User software interrupt\n");
             break;
@@ -130,6 +131,17 @@ void interrupt_handler(struct trapframe *tf) {
              *(3)当计数器加到100的时候，我们会输出一个`100ticks`表示我们触发了100次时钟中断，同时打印次数（num）加一
             * (4)判断打印次数，当打印次数为10时，调用<sbi.h>中的关机函数关机
             */
+            clock_set_next_event();
+            ticks++;
+            static int num=0;
+            if(ticks==TICK_NUM){
+                print_ticks();
+                num++;
+                ticks=0;
+            }
+            if(num==10){
+                sbi_shutdown();
+            }
             break;
         case IRQ_H_TIMER:
             cprintf("Hypervisor software interrupt\n");
@@ -156,7 +168,7 @@ void interrupt_handler(struct trapframe *tf) {
 }
 
 void exception_handler(struct trapframe *tf) {
-    switch (tf->cause) {
+    switch (tf->cause) { // tf->cause 是异常编号
         case CAUSE_MISALIGNED_FETCH:
             break;
         case CAUSE_FAULT_FETCH:
@@ -199,8 +211,8 @@ void exception_handler(struct trapframe *tf) {
     }
 }
 
-static inline void trap_dispatch(struct trapframe *tf) {
-    if ((intptr_t)tf->cause < 0) {
+static inline void trap_dispatch(struct trapframe *tf) { // 处理异常
+    if ((intptr_t)tf->cause < 0) { // 根据 tf->cause 的符号位判断是中断还是异常
         // interrupts
         interrupt_handler(tf);
     } else {
@@ -215,7 +227,7 @@ static inline void trap_dispatch(struct trapframe *tf) {
  * the code in kern/trap/trapentry.S restores the old CPU state saved in the
  * trapframe and then uses the iret instruction to return from the exception.
  * */
-void trap(struct trapframe *tf) {
+void trap(struct trapframe *tf) { // 被汇编陷入/中断入口最终调用的C级分发器
     // dispatch based on what type of trap occurred
     trap_dispatch(tf);
 }

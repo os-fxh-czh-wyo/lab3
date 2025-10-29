@@ -3,7 +3,11 @@
 #include <sbi.h>
 #include <stdio.h>
 #include <riscv.h>
-
+/*
+初始化并安排周期性时钟中断，提供读取时间、安排下一次中断的接口，
+以及维护一个用于统计的全局计数器 ticks。
+内核通过它来实现“每隔固定周期触发一次 timer 中断”的机制。
+*/
 volatile size_t ticks;
 
 static inline uint64_t get_cycles(void) {
