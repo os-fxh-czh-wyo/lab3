@@ -80,24 +80,24 @@ satp physical address: 0x0000000080205000
 - **ucore中处理中断异常的流程**
   1. 硬件触发阶段：
       当硬件检测到中断或异常时，自动执行以下动作：
-     - 将触发点的 PC 写入 `sepc`；
-     - 更新 `sstatus`：`SPIE ← SIE`、`SIE ← 0`，并设置 `SPP` 为之前的特权级；
-     - 将中断或异常原因写入 `scause`，若有相关地址则写入 `sbadaddr`。
+     - 将触发点的 PC 写入 sepc；
+     - 更新 sstatus：SPIE ← SIE、SIE ← 0，并设置 SPP 为之前的特权级；
+     - 将中断或异常原因写入 scause，若有相关地址则写入 sbadaddr。
   2. 异常入口跳转：
-      硬件根据 `stvec` 跳转到异常入口向量 `_alltraps`（在 `idt_init` 中设置）。
+      硬件根据 stvec 跳转到异常入口向量 _alltraps（在 idt_init 中设置）。
   3. 汇编层保存上下文：
-      `_alltraps` 中通过 `SAVE_ALL` 宏保存全部通用寄存器和关键 CSR，在当前栈上形成一个完整的 `trapframe`。
+      _alltraps 中通过 SAVE_ALL 宏保存全部通用寄存器和关键 CSR，在当前栈上形成一个完整的 trapframe。
   4. 调用 C 层分发函数：
-      汇编入口将 `sp` 传递给 `a0`，然后执行 `jal trap` 调用 C 语言层的 `trap` 函数。
+      汇编入口将 sp 传递给 a0，然后执行 jal trap 调用 C 语言层的 trap 函数。
   5. C 层分发处理：
-      `trap` 调用 `trap_dispatch`，根据 `scause` 判断中断或异常类型并执行相应的处理函数。
+      trap 调用 trap_dispatch，根据 scause 判断中断或异常类型并执行相应的处理函数。
   6. 返回汇编层：
-      C 层处理完成后返回汇编入口，返回点位于 `__trapret` 之后。
+      C 层处理完成后返回汇编入口，返回点位于 __trapret 之后。
   7. 恢复上下文与返回：
-      汇编层通过 `RESTORE_ALL` 宏恢复通用寄存器和关键 CSR，最后执行 `sret` 返回到异常前的执行点。
-- **`mov a0，sp`  的目的**：传参，按 RISC‑V 的函数调用约定，a0 是第 1 个参数寄存器。这条指令把当前的栈指针（此时指向刚刚由 `SAVE_ALL` 在栈上构造好的 `trapframe`）作为参数传给 C 层的 `trap(struct trapframe *tf)`。
-- **`SAVE_ALL` 中寄存器保存在栈中的位置** ：由 STORE 指令的槽号定义，C层 `trapframe` 和 `pushregs`中的定义顺序需要与之对应，后续这些寄存器都要作为函数 `trap` 的参数的具体内容。
-- **对于任何中断，``__alltraps` 中是否需要保存所有寄存器** : 是的，因为中断/异常是异步发生的，可能打断任意指令周期和任意代码（用户态或内核态），必须把被打断上下文完整保存才能正确恢复执行并保证被打断程序/内核状态不被破坏。
+      汇编层通过 RESTORE_ALL 宏恢复通用寄存器和关键 CSR，最后执行 sret 返回到异常前的执行点。
+- **mov a0，sp  的目的**：传参，按 RISC‑V 的函数调用约定，a0 是第 1 个参数寄存器。这条指令把当前的栈指针（此时指向刚刚由 SAVE_ALL 在栈上构造好的 trapframe）作为参数传给 C 层的 trap(struct trapframe *tf)。
+- **SAVE_ALL 中寄存器保存在栈中的位置** ：由 STORE 指令的槽号定义，C层 trapframe 和 pushregs中的定义顺序需要与之对应，后续这些寄存器都要作为函数 trap 的参数的具体内容。
+- **对于任何中断，__alltraps 中是否需要保存所有寄存器** : 是的，因为中断/异常是异步发生的，可能打断任意指令周期和任意代码（用户态或内核态），必须把被打断上下文完整保存才能正确恢复执行并保证被打断程序/内核状态不被破坏。
 
 ### 扩展练习 Challenge2：理解上下文切换机制
 
@@ -105,17 +105,17 @@ satp physical address: 0x0000000080205000
 
 **解答 ：**
 
-- 在 `trapentry.S` 中汇编代码`csrw sscratch, sp；csrrw s0, sscratch, x0 `实现了什么操作，目的是什么?
+- 在 trapentry.S 中汇编代码 csrw sscratch, sp；csrrw s0, sscratch, x0 实现了什么操作，目的是什么?
 
-  - `csrw sscratch, sp`：将`sp`的值赋值给`sscratch`
-  - `csrrw s0, sscratch, x0`：将`sscratch`赋值给`s0`，将`sscratch`置0
+  - csrw sscratch, sp：将 sp 的值赋值给 sscratch
+  - csrrw s0, sscratch, x0：将 sscratch 赋值给 s0 ，将 sscratch 置0
 
-  目的：使用 `s0` 来表示函数调用前栈顶的位置，之后在 `2*REGBYTES(sp)` 保存 。将`sscratch`置 0 ，作为 “已进入内核 trap 处理” 的标志，这样如果在处理期间发生递归/嵌套异常，新的入口读到 `sscratch==0` 就能识别出是从内核上下文来的递归 trap。
+  目的：使用  s0  来表示函数调用前栈顶的位置，之后在 2*REGBYTES(sp) 保存 。将 sscratch 置 0 ，作为 “已进入内核 trap 处理” 的标志，这样如果在处理期间发生递归/嵌套异常，新的入口读到 sscratch==0 就能识别出是从内核上下文来的递归 trap。
 
-- `save all` 里面保存了`stval`、`scause`这些 csr，而在`restore all`里面却不还原它们？那这样 store 的意义何在呢？
+- save all 里面保存了 stval、scause 这些 csr ，而在 restore all 里面却不还原它们？那这样 store 的意义何在呢？
 
-  - 不还原的原因：因为它们包含有关导致异常或中断的信息，而异常已经由`trap`处理过了，没有必要再去还原。
-  - 意义：将这些状态寄存器作为参数的一部分传递给`trap`函数，一是函数中需要用，二是确保在处理异常或中断时能够保留关键的执行上下文，以供进一步处理或记录异常信息。
+  - 不还原的原因：因为它们包含有关导致异常或中断的信息，而异常已经由 trap处理过了，没有必要再去还原。
+  - 意义：将这些状态寄存器作为参数的一部分传递给 trap 函数，一是函数中需要用，二是确保在处理异常或中断时能够保留关键的执行上下文，以供进一步处理或记录异常信息。
 
 ### 扩展练习 Challenge3：完善异常中断
 
