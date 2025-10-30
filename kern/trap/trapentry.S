@@ -2,11 +2,13 @@
 
     .macro SAVE_ALL
 
-    csrw sscratch, sp
+    csrw sscratch, sp # 保存原先的栈顶指针到sscratch
 
+    # 让栈顶指针向低地址空间延伸 36个寄存器的空间，可以放下一个trapFrame结构体。
     addi sp, sp, -36 * REGBYTES
     # save x registers
     STORE x0, 0*REGBYTES(sp)
+    # x2 是 sp 寄存器，稍后保存
     STORE x1, 1*REGBYTES(sp)
     STORE x3, 3*REGBYTES(sp)
     STORE x4, 4*REGBYTES(sp)
@@ -41,13 +43,14 @@
     # get sr, epc, badvaddr, cause
     # Set sscratch register to 0, so that if a recursive exception
     # occurs, the exception vector knows it came from the kernel
+    # s0 := old(sscratch); sscratch := 0。
     csrrw s0, sscratch, x0
     csrr s1, sstatus
     csrr s2, sepc
     csrr s3, sbadaddr
     csrr s4, scause
 
-    STORE s0, 2*REGBYTES(sp)
+    STORE s0, 2*REGBYTES(sp) 
     STORE s1, 32*REGBYTES(sp)
     STORE s2, 33*REGBYTES(sp)
     STORE s3, 34*REGBYTES(sp)
@@ -59,6 +62,7 @@
     LOAD s1, 32*REGBYTES(sp)
     LOAD s2, 33*REGBYTES(sp)
 
+    # 注意之前保存的几个CSR并不都需要恢复
     csrw sstatus, s1
     csrw sepc, s2
 
@@ -100,14 +104,18 @@
     .globl __alltraps
     .align(2)
 __alltraps:
+    # 把当前上下文（寄存器 + 重要 CSR）保存成一个 trapframe 放在当前栈上
     SAVE_ALL
 
+    # 将当前栈指针（指向保存好的 trapframe）放到 a0。
     move  a0, sp
     jal trap
     # sp should be the same as before "jal trap"
 
     .globl __trapret
 __trapret:
+    # 把在 SAVE_ALL 中保存的 trapframe 恢复回寄存器/CSR
     RESTORE_ALL
     # return from supervisor call
+    # 跳回到发生异常/中断时的指令
     sret

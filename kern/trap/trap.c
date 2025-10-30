@@ -47,9 +47,9 @@ void idt_init(void) {
     extern void __alltraps(void); // 由汇编/工具生成的所有中断/异常入口点的统一入口
     /* Set sup0 scratch register to 0, indicating to exception vector
        that we are presently executing in the kernel */
-    write_csr(sscratch, 0);
+    write_csr(sscratch, 0); // 通知 trap 入口当前处于内核上下文
     /* Set the exception vector address */
-    write_csr(stvec, &__alltraps); // 把Supervisor trap vector基址写入 stvec，使得以后发生的 S-mode 异常/中断会跳转到 __alltraps
+    write_csr(stvec, &__alltraps); // 将 __alltraps 的地址写入 CSR 寄存器 stvec，使得以后发生的 S-mode 异常/中断会跳转到 __alltraps
 }
 
 /* trap_in_kernel - test if trap happened in kernel */
