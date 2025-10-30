@@ -105,14 +105,14 @@ satp physical address: 0x0000000080205000
 
 **解答 ：**
 
-- 在 trapentry.S 中汇编代码 csrw sscratch, sp；csrrw s0, sscratch, x0 实现了什么操作，目的是什么?
+- **在 trapentry.S 中汇编代码 csrw sscratch, sp；csrrw s0, sscratch, x0 实现了什么操作，目的是什么?**
 
   - csrw sscratch, sp：将 sp 的值赋值给 sscratch
   - csrrw s0, sscratch, x0：将 sscratch 赋值给 s0 ，将 sscratch 置0
 
   目的：使用  s0  来表示函数调用前栈顶的位置，之后在 2*REGBYTES(sp) 保存 。将 sscratch 置 0 ，作为 “已进入内核 trap 处理” 的标志，这样如果在处理期间发生递归/嵌套异常，新的入口读到 sscratch==0 就能识别出是从内核上下文来的递归 trap。
 
-- save all 里面保存了 stval、scause 这些 csr ，而在 restore all 里面却不还原它们？那这样 store 的意义何在呢？
+- **save all 里面保存了 stval、scause 这些 csr ，而在 restore all 里面却不还原它们？那这样 store 的意义何在呢？**
 
   - 不还原的原因：因为它们包含有关导致异常或中断的信息，而异常已经由 trap处理过了，没有必要再去还原。
   - 意义：将这些状态寄存器作为参数的一部分传递给 trap 函数，一是函数中需要用，二是确保在处理异常或中断时能够保留关键的执行上下文，以供进一步处理或记录异常信息。
