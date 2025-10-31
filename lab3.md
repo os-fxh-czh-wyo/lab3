@@ -121,10 +121,179 @@ satp physical address: 0x0000000080205000
 
 > 编程完善在触发一条非法指令异常和断点异常，在 kern/trap/trap.c的异常处理函数中捕获，并对其进行处理，简单输出异常类型和异常指令触发地址，即“Illegal instruction caught at 0x(地址)”，“ebreak caught at 0x（地址）”与“Exception type:Illegal instruction"，“Exception type: breakpoint”。
 
-**实现过程 ：**
+**实现过程 ：** 当检测到异常时，先输出异常类型，然后定位异常发生的具体地址，然后更新异常程序计数器，让它指向下一条指令。由于每条指令长度为4字节，因此实现方法就是指向4字节后的位置。
+
+```bash```
+void exception_handler(struct trapframe *tf) {
+    switch (tf->cause) { // tf->cause 是异常编号
+        case CAUSE_MISALIGNED_FETCH:
+            break;
+        case CAUSE_FAULT_FETCH:
+            break;
+        case CAUSE_ILLEGAL_INSTRUCTION:
+             // 非法指令异常处理
+             /* LAB3 CHALLENGE3   YOUR CODE :  */
+            /*(1)输出指令异常类型（ Illegal instruction）
+             *(2)输出异常指令地址
+             *(3)更新 tf->epc寄存器
+            */
+            cprintf("Exception type: Illegal instruction\n");
+            cprintf("Illegal instruction caught at 0x%08x\n", tf->epc);
+            tf->epc += 4;
+            break;
+        case CAUSE_BREAKPOINT:
+            //断点异常处理
+            /* LAB3 CHALLLENGE3   YOUR CODE :  */
+            /*(1)输出指令异常类型（ breakpoint）
+             *(2)输出异常指令地址
+             *(3)更新 tf->epc寄存器
+            */
+            cprintf("Exception type: breakpoint\n");
+            cprintf("ebreak caught at 0x%08x\n", tf->epc);
+            tf->epc += 4;
+            break;
+        case CAUSE_MISALIGNED_LOAD:
+            break;
+        case CAUSE_FAULT_LOAD:
+            break;
+        case CAUSE_MISALIGNED_STORE:
+            break;
+        case CAUSE_FAULT_STORE:
+            break;
+        case CAUSE_USER_ECALL:
+            break;
+        case CAUSE_SUPERVISOR_ECALL:
+            break;
+        case CAUSE_HYPERVISOR_ECALL:
+            break;
+        case CAUSE_MACHINE_ECALL:
+            break;
+        default:
+            print_trapframe(tf);
+            break;
+    }
+}
+```
+
+调试时，在init.c中插入异常代码，触发设计好的异常处理程序。
+
+```bash```
+static void test_challenge3(void) {
+    cprintf("===== Starting Challenge 3 Tests =====\n");
+    // 只测试一次，避免重复触发
+    static int test_done = 0;
+    if (test_done) {
+        cprintf("Tests already completed, skipping...\n");
+        return;
+    }
+    test_done = 1;
+    cprintf("Testing Challenge 3: Exception Handling\n"); 
+    // 测试1: 断点异常
+    cprintf("--- Test 1: Breakpoint Exception ---\n");
+    cprintf("About to trigger breakpoint...\n");
+    asm volatile ("ebreak");
+    cprintf("Breakpoint handled successfully!\n");
+    // 测试2: 非法指令异常
+    cprintf("--- Test 2: Illegal Instruction Exception ---\n"); 
+    cprintf("About to trigger illegal instruction...\n");
+    asm volatile (".word 0x00000000");
+    cprintf("Illegal instruction handled successfully!\n");
+    
+    cprintf("===== Challenge 3 Tests Completed =====\n");
+}
+```
 
 **结果 :**
 
+```bash```
+OpenSBI v0.4 (Jul  2 2019 11:53:53)
+   ____                    _____ ____ _____
+  / __ \                  / ____|  _ \_   _|
+ | |  | |_ __   ___ _ __ | (___ | |_) || |
+ | |  | | '_ \ / _ \ '_ \ \___ \|  _ < | |
+ | |__| | |_) |  __/ | | |____) | |_) || |_
+  \____/| .__/ \___|_| |_|_____/|____/_____|
+        | |
+        |_|
+
+Platform Name          : QEMU Virt Machine
+Platform HART Features : RV64ACDFIMSU
+Platform Max HARTs     : 8
+Current Hart           : 0
+Firmware Base          : 0x80000000
+Firmware Size          : 112 KB
+Runtime SBI Version    : 0.1
+
+PMP0: 0x0000000080000000-0x000000008001ffff (A)
+PMP1: 0x0000000000000000-0xffffffffffffffff (A,R,W,X)
+DTB Init
+HartID: 0
+DTB Address: 0x82200000
+Physical Memory from DTB:
+  Base: 0x0000000080000000
+  Size: 0x0000000008000000 (128 MB)
+  End:  0x0000000087ffffff
+DTB init completed
+(THU.CST) os is loading ...
+Special kernel symbols:
+  entry  0xffffffffc0200054 (virtual)
+  etext  0xffffffffc0201fe0 (virtual)
+  edata  0xffffffffc0207028 (virtual)
+  end    0xffffffffc02074a0 (virtual)
+Kernel executable memory footprint: 30KB
+memory management: default_pmm_manager
+physcial memory map:
+  memory: 0x0000000008000000, [0x0000000080000000, 0x0000000087ffffff].
+check_alloc_page() succeeded!
+satp virtual address: 0xffffffffc0206000
+satp physical address: 0x0000000080206000
+++ setup timer interrupts
+===== Starting Challenge 3 Tests =====
+===== Starting Challenge 3 Tests =====
+Testing Challenge 3: Exception Handling
+--- Test 1: Breakpoint Exception ---
+About to trigger breakpoint...
+Exception type: breakpoint
+ebreak caught at 0xc02000ec
+Exception type: Illegal instruction
+Illegal instruction caught at 0xc02000f0
+DTB Init
+HartID: 0
+DTB Address: 0x82200000
+Physical Memory from DTB:
+  Base: 0x0000000080000000
+  Size: 0x0000000008000000 (128 MB)
+  End:  0x0000000087ffffff
+DTB init completed
+(THU.CST) os is loading ...
+Special kernel symbols:
+  entry  0xffffffffc0200054 (virtual)
+  etext  0xffffffffc0201fe0 (virtual)
+  edata  0xffffffffc0207028 (virtual)
+  end    0xffffffffc02074a0 (virtual)
+Kernel executable memory footprint: 30KB
+memory management: default_pmm_manager
+physcial memory map:
+  memory: 0x0000000008000000, [0x0000000080000000, 0x0000000087ffffff].
+check_alloc_page() succeeded!
+satp virtual address: 0xffffffffc0206000
+satp physical address: 0x0000000080206000
+++ setup timer interrupts
+===== Starting Challenge 3 Tests =====
+===== Starting Challenge 3 Tests =====
+Tests already completed, skipping...
+===== Challenge 3 Tests Completed =====
+100 ticks
+100 ticks
+100 ticks
+100 ticks
+100 ticks
+100 ticks
+100 ticks
+100 ticks
+100 ticks
+100 ticks
+```
 
 
 
